@@ -1,0 +1,35 @@
+name: Deploy to Tomcat
+
+on:
+  push:
+    branches:
+      - main  # Change this to match your main branch name
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up JDK
+      uses: actions/setup-java@v2
+      with:
+        distribution: 'adopt'
+        java-version: '11'
+
+    - name: Build WAR
+      run: ./gradlew build  # Adjust this command based on your build tool (e.g., Maven: mvn package)
+
+    - name: Deploy to Tomcat
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.TOMCAT_HOST }}
+        username: ${{ secrets.TOMCAT_USERNAME }}
+        password: ${{ secrets.TOMCAT_PASSWORD }}
+        script: |
+          cd /path/to/tomcat/webapps
+          rm -rf your-app.war your-app  # Remove previous deployment
+          cp /path/to/your/app/build/libs/your-app.war .
+          sudo service tomcat restart  # Adjust this command based on how you manage Tomcat
