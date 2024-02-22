@@ -1,35 +1,38 @@
-name: Deploy to Tomcat
+---
+- name: Deploy Java package on Apache Tomcat locally
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    java_package_name: com.mypru
+    java_package_version: "0.0.1-SNAPSHOT"
+    tomcat_bin_dir: "/opt/tomcat/bin"
+    tomcat_webapps_dir: "/opt/tomcat/webapps"
+    github_token: "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"
 
-on:
-  push:
-    branches:
-      - main  # Change this to match your main branch name
+  tasks:
+    - name: Ensure Tomcat bin directory exists
+      file:
+        path: "{{ tomcat_bin_dir }}"
+        state: directory
+        mode: '0755'
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
+    - name: Stop Tomcat
+      command: "{{ tomcat_bin_dir }}/shutdown.sh"
+      ignore_errors: true
+      async: 300
+      poll: 0
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+    - name: Wait for Tomcat to stop
+      wait_for:
+        path: "{{ tomcat_bin_dir }}/shutdown.sh"
+        state: absent
 
-    - name: Set up JDK
-      uses: actions/setup-java@v2
-      with:
-        distribution: 'adopt'
-        java-version: '11'
+    - name: Download Java package from GitHub release
+      shell: gh release download java-maven5-1.1 --repo pravesh-77/publish-java-package-with-maven --pattern "*.war" --dir "{{ tomcat_webapps_dir }}"
+      environment:
+        GITHUB_TOKEN: "{{ GITHUB_Token }}"
+      register: download_result
 
-    - name: Build WAR
-      run: ./gradlew build  # Adjust this command based on your build tool (e.g., Maven: mvn package)
-
-    - name: Deploy to Tomcat
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.TOMCAT_HOST }}
-        username: ${{ secrets.TOMCAT_USERNAME }}
-        password: ${{ secrets.TOMCAT_PASSWORD }}
-        script: |
-          cd /path/to/tomcat/webapps
-          rm -rf your-app.war your-app  # Remove previous deployment
-          cp /path/to/your/app/build/libs/your-app.war .
-          sudo service tomcat restart  # Adjust this command based on how you manage Tomcat
+    - name: Start Tomcat
+      command: "{{ tomcat_bin_dir }}/startup.sh"
